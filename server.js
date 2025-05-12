@@ -4,6 +4,7 @@ import path from 'path';
 import multer from 'multer';
 import { fileURLToPath } from 'url';
 import { getLatestBlock, verifyCertificateHash } from './blockchain.js';
+import { extractTextAndQR } from './utils/ocr.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -11,48 +12,47 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = 3000;
 
-// Middleware to parse JSON
+// Middleware
 app.use(express.json());
-
-// Serve static files from 'public' directory
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Configure multer for file uploads
+// Multer setup
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
-    cb(null, 'uploads/'); // Ensure this directory exists
+    cb(null, 'uploads/');
   },
   filename: function (req, file, cb) {
-    cb(null, file.originalname); // You can customize the filename as needed
+    cb(null, Date.now() + '-' + file.originalname);
   }
 });
 const upload = multer({ storage: storage });
 
-// Route to get the latest Ethereum block number
-app.get('/block', async (req, res) => {
-  const blockNumber = await getLatestBlock();
-  if (blockNumber !== null) {
-    res.json({ latestBlock: blockNumber });
-  } else {
-    res.status(500).json({ error: 'Failed to fetch latest block' });
-  }
-});
-
-// Route to handle certificate upload and verification
+// POST: Upload + OCR + QR + Validation
 app.post('/upload', upload.single('certificateFile'), async (req, res) => {
   if (!req.file) {
     return res.status(400).json({ error: 'No file uploaded' });
   }
 
-  // Placeholder: Extract hash from the uploaded certificate
-  // Implement your actual logic to extract and verify the certificate hash
-  const certificateHash = 'dummy_hash';
+  try {
+    const filePath = req.file.path;
+    const { extractedText, qrCode } = await extractTextAndQR(filePath);
 
-  const isValid = await verifyCertificateHash(certificateHash);
-  res.json({ valid: isValid });
+    const isValid = await verifyCertificateHash('dummy_hash'); // You can pass extracted data here for hash lookup
+
+    res.json({
+      valid: isValid,
+      studentName: extractedText.studentName,
+      course: extractedText.courseName,
+      certificateTitle: extractedText.certificateTitle,
+      qrData: qrCode || 'No QR code found'
+    });
+  } catch (error) {
+    console.error('Processing error:', error);
+    res.status(500).json({ error: 'Failed to process certificate' });
+  }
 });
 
-// Start the server
+// Start server
 app.listen(PORT, () => {
   console.log(`Server running at http://localhost:${PORT}`);
 });

@@ -20,7 +20,8 @@ export async function verifyCertificateHash(hash) {
   try {
     // Placeholder logic for verifying certificate hash
     // Implement your actual verification logic here
-    return true;
+    console.log(`Verifying certificate hash: ${hash}`);
+    return true; // For now, returning true for testing
   } catch (error) {
     console.error('Error verifying certificate hash:', error);
     return false;
